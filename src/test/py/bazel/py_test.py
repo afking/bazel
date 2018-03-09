@@ -115,5 +115,40 @@ class TestInitPyFiles(test_base.TestBase):
         os.path.exists('bazel-bin/src/a/a.runfiles/__main__/src/a/__init__.py'))
 
 
+class TestPy3(test_base.TestBase):
+
+  def createSimpleFiles(self):
+    self.ScratchFile('WORKSPACE')
+
+    self.ScratchFile('BUILD', [
+        'py_library(name="a", srcs=["a.py"], srcs_version = "PY3")',
+        'py_binary(name="b", srcs=["b.py"], deps=[":a"], srcs_version="PY3", default_python_version="PY3")',
+        'py_test(name="t", srcs=["t.py"], deps=[":a"], srcs_version="PY3", default_python_version="PY3")',
+    ])
+
+    self.ScratchFile('a.py', [
+        'import sys',
+        'if sys.version_info[0] < 3:',
+        '  raise Exception("Not python 3")'
+    ])
+
+    self.ScratchFile('b.py', [
+        'import a',
+    ])
+
+    self.ScratchFile('t.py', [
+        'import a',
+    ])
+
+  def testPyBinary(self):
+    self.createSimpleFiles()
+    exit_code, _, stderr = self.RunBazel(['run', '//:b'])
+    self.AssertExitCode(exit_code, 0, stderr)
+
+  def testPyTest(self):
+    self.createSimpleFiles()
+    exit_code, _, stderr = self.RunBazel(['test', '//:t'])
+    self.AssertExitCode(exit_code, 0, stderr)
+
 if __name__ == '__main__':
   unittest.main()
